@@ -1,4 +1,5 @@
 from random import randint
+import sys
 import pygame
 # Coded in pygame version 2.1.2
 
@@ -10,45 +11,24 @@ SCREEN_HEIGHT = 500
 IMAGE_SIDE_LENGTH = 64
 SCREEN_LENGTH_END = SCREEN_LENGTH - IMAGE_SIDE_LENGTH
 SCREEN_HEIGHT_END = SCREEN_HEIGHT - IMAGE_SIDE_LENGTH
-BALLOON_CHANGE = 0.5
+BALLOON_CHANGE = 4
 BOW_CHANGE = 1
 ARROW_CHANGE = BALLOON_CHANGE * 10
 WHITE_RGB = (255, 255, 255)
 BLACK_RGB = (0, 0, 0)
 
 pygame.init()
-screen = pygame.display.set_mode((SCREEN_LENGTH, SCREEN_HEIGHT))
-
-
-pygame.display.set_caption("Balloon game")
-balloonImage = pygame.image.load("images/balloon.png")
-pygame.display.set_icon(balloonImage)
-
 
 class Balloon:
     def __init__(self) -> None:
         """ Balloon constructor. Randomly generates starting y-coordinate, always starts on the far left column."""
         self.x = 0
         self.y = randint(0, SCREEN_HEIGHT_END)
-        self.image = balloonImage
-        
-    def printBalloon(self) -> None:
-        """ Prints the balloon at its current location. """
-        screen.blit(self.image, (self.x, self.y))
+        self.image = pygame.image.load("images/balloon.png")
 
-    def moveUp(self) -> None:
-        """ Moves the balloon up and prints it in its new location. """
-        self.y -= BALLOON_CHANGE
-        if self.y < 0:
-            self.y = 0
-        screen.blit(self.image, (self.x, self.y))
-
-    def moveDown(self) -> None:
-        """ Moves the balloon down and prints it in its new location. """
-        self.y += BALLOON_CHANGE
-        if self.y > SCREEN_HEIGHT_END:
-            self.y = SCREEN_HEIGHT_END
-        screen.blit(self.image, (self.x, self.y))
+    def move(self) -> None:
+        """ Randomly determines where the ballon goes and by how much """
+        self.y += randint(-BALLOON_CHANGE, BALLOON_CHANGE)
 
 class Bow:
     def __init__(self) -> None:
@@ -57,29 +37,23 @@ class Bow:
         self.y = SCREEN_HEIGHT_END / 2
         self.image = pygame.image.load("images/bow.png")
 
-    def printBow(self) -> None:
-        """ Prints the bow at its current location. """
-        screen.blit(self.image, (self.x, self.y))
-
     def moveUp(self) -> None:
         """ Moves the bow up and prints it in its new location. """
         self.y -= BOW_CHANGE
         if self.y < 0:
             self.y = 0
-        screen.blit(self.image, (self.x, self.y))
 
     def moveDown(self) -> None:
         """ Moves the bow down and prints it in its new location. """
         self.y += BOW_CHANGE
         if self.y > SCREEN_HEIGHT_END:
             self.y = SCREEN_HEIGHT_END
-        screen.blit(self.image, (self.x, self.y))
 
 class Arrow:
     def __init__(self, bow: Bow) -> None:
         """ Arrow constructor."""
-        self.x = bow.x - IMAGE_SIDE_LENGTH
-        self.y = bow.y
+        self.x = -100
+        self.y = -100
         self.state = "ready"
         self.image = pygame.image.load("images/arrow.png")
 
@@ -90,61 +64,91 @@ class Arrow:
         """ Prints the balloon in front of the bow. """
         self.x = bow.x - IMAGE_SIDE_LENGTH
         self.y = bow.y
-        screen.blit(self.image, (self.x, self.y))
 
     def fireArrow(self) -> None:
         """ Arrow will move towards balloon. """
         self.x -= ARROW_CHANGE
         if self.x < 0:
             self.state = "ready"
-        screen.blit(self.image, (self.x, self.y))
+            self.x = -100
+            self.y = -100
 
-#### Driver Loop ####
-balloon = Balloon()
-bow = Bow()
-arrow = Arrow(bow)
-score_value = 0
-score_font = pygame.font.Font("freesansbold.ttf", 32)
-running = True
-while running:
-    screen.fill(WHITE_RGB)
-    #Score
-    score = score_font.render("Missed Shots: " + str(score_value), True, BLACK_RGB)
-    screen.blit(score, (740, 0))
 
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
+class Game():
+    def __init__(self) -> None:
+        self.screen = pygame.display.set_mode((SCREEN_LENGTH, SCREEN_HEIGHT))
+        self.clock = pygame.time.Clock()
+        self.balloon = Balloon()
+        self.bow = Bow()
+        self.arrow = Arrow(self.bow)
+        self.score_value = 0
+        self.game_over = False
+        pygame.display.set_caption("Balloon game")
+        pygame.display.set_icon(self.balloon.image)
 
-    # Balloon Movement
-    rand_num = randint(0, 2)
-    if rand_num == 0:
-        balloon.moveDown()
-    elif rand_num == 1:
-        balloon.moveUp()
-    else:
-        balloon.printBalloon()
+        while 1:
+            self.loop()
 
-    # Bow Movement
-    keys = pygame.key.get_pressed()
-    if keys[pygame.K_UP]:
-        bow.moveUp()
-    if keys[pygame.K_DOWN]:
-        bow.moveDown()
-    bow.printBow()
 
-    # Arrow Movement
-    if keys[pygame.K_SPACE] and arrow.state == "ready":
-        arrow.setStateFire()
-        arrow.printArrow(bow)
-        score_value += 1
-    if arrow.state == "fire":
-        arrow.fireArrow()
+    def loop(self):
+        """ The main game loop."""
+        self.eventLoop()
+        self.draw()
+        pygame.display.update()
 
-    # Collision
-    if balloon.image.get_rect(x = balloon.x, y = balloon.y).colliderect(arrow.image.get_rect(x = arrow.x, y = arrow.y)):
-        game_over_font = pygame.font.Font("freesansbold.ttf", 64)
-        game_over = game_over_font.render("GAME OVER", True, BLACK_RGB)
-        screen.blit(game_over, game_over.get_rect(center = screen.get_rect().center))
+    def eventLoop(self):
+        """ The main event loop, detects keypresses and updates movements."""
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+        if not self.game_over:
+            # Balloon Movement
+            self.balloon.move()
 
-    pygame.display.update()
+            # Bow Movement
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_UP]:
+                self.bow.moveUp()
+            if keys[pygame.K_DOWN]:
+                self.bow.moveDown()
+
+            # Arrow Movement
+            if keys[pygame.K_SPACE] and self.arrow.state == "ready":
+                self.arrow.setStateFire()
+                self.arrow.printArrow(self.bow)
+                self.score_value += 1
+            if self.arrow.state == "fire":
+                self.arrow.fireArrow()
+            
+            if self.is_collision():
+                self.game_over = True
+
+
+    def draw(self):
+        """ Calls all bilts for all objects needed. """
+        self.screen.fill(WHITE_RGB)
+        #Score
+        score_font = pygame.font.Font("freesansbold.ttf", 32)
+        score_text = score_font.render("Missed Shots: " + str(self.score_value), True, BLACK_RGB)
+        self.screen.blit(score_text, (700, 0))
+        if self.game_over:
+            game_over_font = pygame.font.Font("freesansbold.ttf", 64)
+            game_over_text = game_over_font.render("GAME OVER", True, BLACK_RGB)
+            self.screen.blit(game_over_text, game_over_text.get_rect(center = self.screen.get_rect().center))
+        else:
+            self.screen.blit(self.balloon.image, (self.balloon.x, self.balloon.y))
+            self.screen.blit(self.arrow.image, (self.arrow.x, self.arrow.y))
+            self.screen.blit(self.bow.image, (self.bow.x, self.bow.y))
+    
+    def is_collision(self) -> bool:
+        """ Returns true if arrow and balloon collides with each other. """
+        a = self.arrow
+        b = self.balloon
+        if b.image.get_rect(x = b.x, y = b.y).colliderect(a.image.get_rect(x = a.x, y = a.y)):
+            return True
+        else:
+            return False
+
+if __name__ == "__main__":
+    Game()
