@@ -11,9 +11,7 @@ SCREEN_HEIGHT = 500
 IMAGE_SIDE_LENGTH = 64
 SCREEN_LENGTH_END = SCREEN_LENGTH - IMAGE_SIDE_LENGTH
 SCREEN_HEIGHT_END = SCREEN_HEIGHT - IMAGE_SIDE_LENGTH
-BALLOON_CHANGE = 4
-BOW_CHANGE = 1
-ARROW_CHANGE = BALLOON_CHANGE * 10
+BALLOON_SPEED = 4
 WHITE_RGB = (255, 255, 255)
 BLACK_RGB = (0, 0, 0)
 
@@ -24,28 +22,35 @@ class Balloon:
         """ Balloon constructor. Randomly generates starting y-coordinate, always starts on the far left column."""
         self.x = 0
         self.y = randint(0, SCREEN_HEIGHT_END)
+        self.velocity = BALLOON_SPEED
         self.image = pygame.image.load("images/balloon.png")
 
     def move(self) -> None:
-        """ Randomly determines where the ballon goes and by how much """
-        self.y += randint(-BALLOON_CHANGE, BALLOON_CHANGE)
+        """ Moves the ballon according to its velocity. Makes sure balloon is always within screen boundary."""
+        self.y += self.velocity
+        if self.y < 0:
+            self.y = 0
+        elif self.y > SCREEN_HEIGHT_END:
+            self.y = SCREEN_HEIGHT_END
+
 
 class Bow:
     def __init__(self) -> None:
         """ Bow constructor. Always starts far right in the middle far right column."""
         self.x = SCREEN_LENGTH_END
         self.y = SCREEN_HEIGHT_END / 2
+        self.velocity = 2.5
         self.image = pygame.image.load("images/bow.png")
 
     def moveUp(self) -> None:
         """ Moves the bow up and prints it in its new location. """
-        self.y -= BOW_CHANGE
+        self.y -= self.velocity
         if self.y < 0:
             self.y = 0
 
     def moveDown(self) -> None:
         """ Moves the bow down and prints it in its new location. """
-        self.y += BOW_CHANGE
+        self.y += self.velocity
         if self.y > SCREEN_HEIGHT_END:
             self.y = SCREEN_HEIGHT_END
 
@@ -54,6 +59,7 @@ class Arrow:
         """ Arrow constructor."""
         self.x = -100
         self.y = -100
+        self.velocity = BALLOON_SPEED * 10
         self.state = "ready"
         self.image = pygame.image.load("images/arrow.png")
 
@@ -67,7 +73,7 @@ class Arrow:
 
     def fireArrow(self) -> None:
         """ Arrow will move towards balloon. """
-        self.x -= ARROW_CHANGE
+        self.x -= self.velocity
         if self.x < 0:
             self.state = "ready"
             self.x = -100
@@ -76,11 +82,14 @@ class Arrow:
 
 class Game():
     def __init__(self) -> None:
+        """ Runs balloon game."""
         self.screen = pygame.display.set_mode((SCREEN_LENGTH, SCREEN_HEIGHT))
         self.clock = pygame.time.Clock()
         self.balloon = Balloon()
         self.bow = Bow()
         self.arrow = Arrow(self.bow)
+        self.threshold = randint(5, 60)
+        self.step = 0
         self.score_value = 0
         self.game_over = False
         pygame.display.set_caption("Balloon game")
@@ -88,7 +97,6 @@ class Game():
 
         while 1:
             self.loop()
-
 
     def loop(self):
         """ The main game loop."""
@@ -98,13 +106,21 @@ class Game():
 
     def eventLoop(self):
         """ The main event loop, detects keypresses and updates movements."""
+        self.clock.tick(60)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
         if not self.game_over:
             # Balloon Movement
+            if self.step >= self.threshold:
+                # Every 5 - 60 steps randomly change direction of the balloon.
+                # Reset step and threshold once direction changes.
+                self.balloon.velocity *= -1
+                self.threshold = randint(5, 60)
+                self.step = 0
             self.balloon.move()
+            self.step += 1
 
             # Bow Movement
             keys = pygame.key.get_pressed()
@@ -128,7 +144,7 @@ class Game():
     def draw(self):
         """ Calls all bilts for all objects needed. """
         self.screen.fill(WHITE_RGB)
-        #Score
+        # Print score top right hand corner.
         score_font = pygame.font.Font("freesansbold.ttf", 32)
         score_text = score_font.render("Missed Shots: " + str(self.score_value), True, BLACK_RGB)
         self.screen.blit(score_text, (700, 0))
